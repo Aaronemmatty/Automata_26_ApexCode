@@ -1,2 +1,0 @@
-﻿# Automata_26_ApexCode
-
