@@ -14,9 +14,13 @@ class Settings(BaseSettings):
     # OCR
     TESSERACT_CMD: str = "tesseract"
 
-    # Gemini AI
+    # Gemini AI (deprecated)
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    # Ollama (local AI)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:7b"
 
     # Google OAuth / Classroom
     GOOGLE_CLIENT_ID: str | None = None

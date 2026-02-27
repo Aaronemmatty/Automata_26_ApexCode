@@ -5,11 +5,7 @@ from typing import Dict, Tuple
 import anyio
 
 from app.config import settings
-
-try:
-    from google import genai
-except Exception:
-    genai = None
+from app.services.ollama_client import ollama_client
 
 
 class AssignmentTimeEstimator:
@@ -243,19 +239,18 @@ async def estimate_assignment_time(text: str, task_type: str | None = None) -> D
         estimator = AssignmentTimeEstimator()
         return estimator.estimate("", task_type)
 
-    if settings.GEMINI_API_KEY and genai is not None:
-        gemini_result = await anyio.to_thread.run_sync(_estimate_with_gemini, safe_text, task_type)
-        if gemini_result is not None:
-            return gemini_result
+    # Try Ollama AI estimation first
+    ollama_result = await _estimate_with_ollama(safe_text, task_type)
+    if ollama_result is not None:
+        return ollama_result
 
+    # Fall back to heuristic estimator
     estimator = AssignmentTimeEstimator()
     return estimator.estimate(safe_text, task_type)
 
 
-def _estimate_with_gemini(text: str, task_type: str | None = None) -> Dict | None:
+async def _estimate_with_ollama(text: str, task_type: str | None = None) -> Dict | None:
     try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
         prompt = (
             "Analyze this assignment text and estimate completion time. "
             "Return ONLY valid JSON with this exact schema keys: "
@@ -269,15 +264,7 @@ def _estimate_with_gemini(text: str, task_type: str | None = None) -> Dict | Non
             f"Assignment text:\n{text[:12000]}"
         )
 
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-        )
-        raw = getattr(response, "text", "") or ""
-        if not raw:
-            return None
-
-        parsed = _parse_gemini_json(raw)
+        parsed = await ollama_client.generate_json(prompt)
         if parsed is None:
             return None
 
@@ -285,30 +272,10 @@ def _estimate_with_gemini(text: str, task_type: str | None = None) -> Dict | Non
         if normalized is None:
             return None
 
-        normalized["analysis_provider"] = "gemini"
+        normalized["analysis_provider"] = "ollama"
         return normalized
     except Exception:
         return None
-
-
-def _parse_gemini_json(raw: str) -> Dict | None:
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?", "", cleaned).strip()
-        cleaned = re.sub(r"```$", "", cleaned).strip()
-
-    try:
-        data = json.loads(cleaned)
-        return data if isinstance(data, dict) else None
-    except Exception:
-        match = re.search(r"\{.*\}", cleaned, flags=re.S)
-        if not match:
-            return None
-        try:
-            data = json.loads(match.group(0))
-            return data if isinstance(data, dict) else None
-        except Exception:
-            return None
 
 
 def _normalize_estimate_payload(payload: Dict) -> Dict | None:

@@ -1,26 +1,17 @@
-# Environment variables
-.env
-.env.local
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-venv/
-env/
-.venv/
+.Python
 *.egg-info/
-
-# Node
-node_modules/
 dist/
 build/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Virtual Environment
+venv/
+env/
+ENV/
 
 # IDE
 .vscode/
@@ -28,10 +19,10 @@ build/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # OS
+.DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Backup files
+*.backup

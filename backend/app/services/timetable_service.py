@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendance import AttendanceRecord, Subject
 from app.models.timetable import TimetableDocument, TimetableEntry
-from app.services.gemini_timetable_extractor import GeminiTimetableExtractor
+from app.services.ollama_timetable_extractor import OllamaTimetableExtractor
 
 
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -56,7 +56,7 @@ async def process_timetable_upload(user_id: UUID, file_name: str, file_path: str
     db.add(doc)
     await db.flush()
 
-    extractor = GeminiTimetableExtractor()
+    extractor = OllamaTimetableExtractor()
     result = await extractor.extract_from_file(file_path)
 
     if result["status"] == "failed":
