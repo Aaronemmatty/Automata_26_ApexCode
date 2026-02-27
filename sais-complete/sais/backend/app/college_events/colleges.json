@@ -1,0 +1,12 @@
+[
+  {
+    "name": "FrCRCE",
+    "base_url": "https://frcrce.ac.in",
+    "sitemap_url": "https://frcrce.ac.in/wp-sitemap.xml",
+    "keywords": ["notice", "exam", "calendar", "timetable", "academic"],
+    "seed_urls": [
+      "https://frcrce.ac.in/academic-holiday-calendar/",
+      "https://frcrce.ac.in/wp-content/uploads/2025/11/Academic_Calender_2025_26.pdf"
+    ]
+  }
+]

@@ -1,0 +1,50 @@
+# SAIS Backend Dependencies
+
+# Web Framework
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Database
+sqlalchemy>=2.0.30
+asyncpg>=0.29.0            # async PostgreSQL driver
+aiosqlite>=0.20.0          # async SQLite driver (local dev fallback)
+alembic>=1.13.1            # database migrations
+psycopg2-binary>=2.9.9     # sync driver (for alembic)
+
+# Authentication
+python-jose[cryptography]>=3.3.0   # JWT
+passlib[bcrypt]>=1.7.4             # password hashing
+python-multipart>=0.0.9            # form/file upload support
+
+# Validation & Settings
+pydantic>=2.7.1
+pydantic-settings>=2.2.1
+
+# AI / NLP
+# spaCy is optional at runtime; extractor falls back to regex/date parsing when unavailable
+
+# OCR
+pytesseract>=0.3.10
+Pillow>=10.4.0             # image processing
+pymupdf>=1.24.3            # PDF to image conversion (fitz)
+
+# Scheduling / Cron
+apscheduler>=3.10.4
+
+# Utilities
+python-dotenv>=1.0.1
+python-dateutil>=2.9.0
+httpx>=0.27.0              # async HTTP client
+aiofiles>=23.2.1           # async file I/O
+google-generativeai>=0.8.5 # Gemini API client
+google-genai>=0.8.0        # New Gemini client (from google import genai)
+python-docx>=1.1.2         # DOCX text extraction
+pdfplumber>=0.11.4         # PDF text/table extraction
+filetype>=1.2.0            # binary-based file type detection
+langdetect>=1.0.9          # optional language detection
+requests>=2.32.3           # sitemap/page crawling
+beautifulsoup4>=4.12.3     # HTML content extraction
+google-api-python-client>=2.149.0
+google-auth>=2.35.0
+google-auth-oauthlib>=1.2.1
+cryptography>=43.0.1
