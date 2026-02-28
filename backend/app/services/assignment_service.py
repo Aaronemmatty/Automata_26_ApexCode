@@ -10,6 +10,13 @@ from app.schemas.schemas import AssignmentCreate, AssignmentUpdate
 from app.services.time_estimator import estimate_assignment_time
 
 async def create_assignment(user_id: UUID, data: AssignmentCreate, db: AsyncSession) -> Assignment:
+    # Auto-estimate time from title + description
+    text_for_estimation = f"{data.title or ''} {data.description or ''}".strip()
+    time_estimate = await estimate_assignment_time(
+        text=text_for_estimation,
+        task_type=data.task_type,
+    )
+
     assignment = Assignment(
         user_id=user_id,
         title=data.title,
@@ -18,7 +25,8 @@ async def create_assignment(user_id: UUID, data: AssignmentCreate, db: AsyncSess
         deadline=data.deadline,
         priority=data.priority,
         status=AssignmentStatus.pending,
-        description=data.description
+        description=data.description,
+        ai_metadata={"time_estimate": time_estimate},
     )
     db.add(assignment)
     await db.flush()
@@ -78,6 +86,29 @@ async def delete_assignment(user_id: UUID, assignment_id: UUID, db: AsyncSession
     assignment = await get_assignment_by_id(user_id, assignment_id, db)
     await db.delete(assignment)
     await db.flush()
+
+
+async def bulk_estimate_assignments(user_id: UUID, db: AsyncSession) -> dict:
+    """Re-run time estimation for all assignments that are missing it."""
+    result = await db.execute(select(Assignment).where(Assignment.user_id == user_id))
+    assignments = list(result.scalars().all())
+
+    updated = 0
+    for assignment in assignments:
+        meta = assignment.ai_metadata or {}
+        if meta.get("time_estimate"):
+            continue  # already estimated
+        text = f"{assignment.title or ''} {assignment.description or ''}".strip()
+        time_estimate = await estimate_assignment_time(
+            text=text,
+            task_type=assignment.task_type,
+        )
+        assignment.ai_metadata = {**meta, "time_estimate": time_estimate}
+        updated += 1
+
+    if updated:
+        await db.flush()
+    return {"updated": updated, "total": len(assignments)}
 
 
 async def get_upcoming_assignments(user_id: UUID, db: AsyncSession, days: int = 7) -> list[Assignment]:

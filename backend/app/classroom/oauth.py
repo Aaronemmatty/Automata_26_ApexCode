@@ -19,6 +19,7 @@ from app.models.integrations import GoogleToken
 SCOPES = [
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
+    "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly",
     "https://www.googleapis.com/auth/classroom.announcements.readonly",
 ]
 
@@ -122,11 +123,23 @@ async def get_valid_access_token(db: AsyncSession, user_id: UUID) -> str:
 
     creds = _build_credentials(access_token, refresh_token, record.expiry, record.scope)
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        try:
+            import asyncio
+            await asyncio.to_thread(creds.refresh, Request())
+        except Exception as exc:
+            raise HTTPException(
+                status_code=401,
+                detail="Google credentials expired or revoked. Please reconnect your Google account.",
+            ) from exc
         record.access_token = encrypt_secret(creds.token)
         if creds.refresh_token:
             record.refresh_token = encrypt_secret(creds.refresh_token)
         record.expiry = creds.expiry
         await db.flush()
+    elif creds.expired and not creds.refresh_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Google access token expired and no refresh token is stored. Please reconnect your Google account.",
+        )
 
     return creds.token

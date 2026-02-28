@@ -56,6 +56,7 @@ async def process_timetable_upload(user_id: UUID, file_name: str, file_path: str
     db.add(doc)
     await db.flush()
 
+    # Use Ollama for timetable extraction (llava:7b for images, qwen2.5:7b for text)
     extractor = OllamaTimetableExtractor()
     result = await extractor.extract_from_file(file_path)
 

@@ -25,6 +25,7 @@ pydantic-settings>=2.2.1
 
 # OCR
 pytesseract>=0.3.10
+rapidocr-onnxruntime>=1.3.0  # fallback OCR when Tesseract binary is not installed
 Pillow>=10.4.0             # image processing
 pymupdf>=1.24.3            # PDF to image conversion (fitz)
 

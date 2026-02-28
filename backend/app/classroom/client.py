@@ -140,3 +140,18 @@ class ClassroomClient:
                 grouped[status].append(assignment)
 
         return grouped
+
+    def get_announcements(self, course_id: str) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        page_token: str | None = None
+        while True:
+            resp = self.service.courses().announcements().list(
+                courseId=course_id,
+                pageSize=100,
+                pageToken=page_token,
+            ).execute()
+            items.extend(resp.get("announcements", []))
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+        return items

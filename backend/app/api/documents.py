@@ -237,6 +237,29 @@ async def upload_document(
     return doc
 
 
+@router.post("/{doc_id}/re-process", status_code=202)
+async def reprocess_document(
+    doc_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Re-trigger text extraction and assignment creation for a document."""
+    result = await db.execute(
+        select(Document).where(Document.id == doc_id, Document.user_id == user.id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc.extraction_status = ExtractionStatus.pending
+    doc.extraction_error = None
+    await db.commit()
+
+    background_tasks.add_task(_process_document, str(doc.id), str(user.id))
+    return {"message": "Re-processing started", "doc_id": str(doc_id)}
+
+
 @router.get("", response_model=List[DocumentOut])
 async def list_documents(
     db: AsyncSession = Depends(get_db),

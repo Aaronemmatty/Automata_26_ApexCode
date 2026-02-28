@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -5,7 +6,8 @@ import re
 from typing import Dict, List
 
 import anyio
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 
 from app.config import settings
@@ -62,8 +64,8 @@ class GeminiTimetableExtractor:
     def __init__(self):
         if not settings.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not configured")
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model_name = settings.GEMINI_MODEL
 
     async def extract_from_file(self, file_path: str) -> Dict:
         try:
@@ -275,10 +277,23 @@ class GeminiTimetableExtractor:
         ext = os.path.splitext(file_path)[1].lower()
         image = self._load_image_for_gemini(file_path, ext)
 
-        response = self.model.generate_content([
-            EXTRACTION_PROMPT,
-            image,
-        ])
+        # Convert PIL Image to bytes for the new SDK
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        image_bytes = buf.getvalue()
+
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_text(text=EXTRACTION_PROMPT),
+                        types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+                    ],
+                )
+            ],
+        )
 
         result_text = (getattr(response, "text", "") or "").strip()
         if not result_text:

@@ -20,15 +20,21 @@ class OllamaClient:
     async def generate(self, prompt: str, **kwargs) -> str:
         """Generate text using Ollama API."""
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            # Short connect timeout so callers fail fast when Ollama is not running;
+            # generous read timeout for inference.
+            timeout = httpx.Timeout(connect=5.0, read=120.0, write=30.0, pool=5.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                # Merge caller kwargs; ensure GPU offloading
+                body = {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"num_gpu": 99},
+                    **kwargs
+                }
                 response = await client.post(
                     f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        **kwargs
-                    }
+                    json=body,
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -61,15 +67,18 @@ class OllamaClient:
     def generate_sync(self, prompt: str, **kwargs) -> str:
         """Synchronous version of generate."""
         try:
-            with httpx.Client(timeout=120.0) as client:
+            timeout = httpx.Timeout(connect=5.0, read=120.0, write=30.0, pool=5.0)
+            with httpx.Client(timeout=timeout) as client:
+                body = {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"num_gpu": 99},
+                    **kwargs
+                }
                 response = client.post(
                     f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.model,
-                        "prompt": prompt,
-                        "stream": False,
-                        **kwargs
-                    }
+                    json=body,
                 )
                 response.raise_for_status()
                 result = response.json()

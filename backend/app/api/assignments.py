@@ -80,3 +80,27 @@ async def estimate_time(
         raise HTTPException(status_code=400, detail="Text is required")
 
     return await estimate_assignment_time(data.text, data.task_type)
+
+
+@router.post("/estimate-all")
+async def estimate_all_assignments(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Backfill time estimates for all assignments missing them."""
+    return await assignment_service.bulk_estimate_assignments(current_user.id, db)
+
+
+@router.post("/{assignment_id}/estimate", response_model=AssignmentOut)
+async def estimate_single(
+    assignment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-run time estimation for a single assignment and save the result."""
+    assignment = await assignment_service.get_assignment_by_id(current_user.id, assignment_id, db)
+    text = f"{assignment.title or ''} {assignment.description or ''}".strip()
+    time_estimate = await estimate_assignment_time(text, assignment.task_type)
+    assignment.ai_metadata = {**(assignment.ai_metadata or {}), "time_estimate": time_estimate}
+    await db.flush()
+    return assignment

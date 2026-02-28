@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,13 +16,13 @@ from .url_filter import filter_urls
 
 logger = logging.getLogger(__name__)
 
+# ─── In-memory cache (college_name -> (timestamp, events)) ────────────
+_events_cache: dict[str, tuple[float, list[dict]]] = {}
+_CACHE_TTL_SECONDS = 600  # 10 minutes
 
-async def fetch_events_for_college(college_name: str, db: AsyncSession) -> list[dict]:
-    loader = CollegeLoader()
-    college = loader.get_by_name(college_name)
-    if college is None:
-        raise ValueError(f"College '{college_name}' not found in config")
 
+def _scrape_events_sync(college) -> list[dict]:
+    """All synchronous web scraping happens here — runs in a thread."""
     sitemap_url = college.sitemap_url or detect_sitemap(college.base_url)
     if not sitemap_url:
         raise ValueError(f"No sitemap found for {college.name}")
@@ -59,6 +61,29 @@ async def fetch_events_for_college(college_name: str, db: AsyncSession) -> list[
         except Exception as exc:
             logger.warning("Skipping %s: %s", url, exc)
 
+    return all_events
+
+
+async def fetch_events_for_college(college_name: str, db: AsyncSession) -> list[dict]:
+    # Check cache first
+    cached = _events_cache.get(college_name)
+    if cached:
+        cached_time, cached_events = cached
+        if time.time() - cached_time < _CACHE_TTL_SECONDS:
+            logger.info("Returning %d cached events for %s", len(cached_events), college_name)
+            return cached_events
+
+    loader = CollegeLoader()
+    college = loader.get_by_name(college_name)
+    if college is None:
+        raise ValueError(f"College '{college_name}' not found in config")
+
+    # Run blocking scraping in a thread so we don't block the event loop
+    all_events = await asyncio.to_thread(_scrape_events_sync, college)
+
     fallback_file = Path("./uploads/college_events_fallback.json")
     saved = await save_events_with_fallback(db, all_events, fallback_file)
+
+    # Cache the results
+    _events_cache[college_name] = (time.time(), saved)
     return saved

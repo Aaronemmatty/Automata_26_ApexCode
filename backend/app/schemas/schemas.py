@@ -60,17 +60,18 @@ class AssignmentUpdate(BaseModel):
 
 
 class AssignmentOut(BaseModel):
-    id:          UUID
-    user_id:     UUID
-    title:       str
-    subject:     Optional[str]
-    task_type:   str
-    description: Optional[str]
-    deadline:    Optional[date]
-    priority:    str
-    status:      str
-    ai_metadata: Optional[dict] = None
-    created_at:  datetime
+    id:                 UUID
+    user_id:            UUID
+    title:              str
+    subject:            Optional[str]
+    task_type:          str
+    description:        Optional[str]
+    deadline:           Optional[date]
+    priority:           str
+    status:             str
+    ai_metadata:        Optional[dict] = None
+    source_document_id: Optional[UUID] = None
+    created_at:         datetime
 
     model_config = {"from_attributes": True}
 
@@ -280,3 +281,47 @@ class DashboardOut(BaseModel):
     unread_alerts:         list[AlertOut]
     total_assignments:     int
     overdue_count:         int
+
+
+# ─── Chat / Chatbot ──────────────────────────────────────────
+
+class ChatMessageOut(BaseModel):
+    id:         UUID
+    role:       str
+    content:    str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatConversationOut(BaseModel):
+    id:          UUID
+    title:       str
+    mode:        str
+    document_id: Optional[UUID] = None
+    is_active:   bool
+    created_at:  datetime
+    updated_at:  datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatConversationDetailOut(ChatConversationOut):
+    messages: list[ChatMessageOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class ChatSendRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class ChatCreateRequest(BaseModel):
+    mode:        str = "general"          # "general" | "viva"
+    document_id: Optional[UUID] = None    # required when mode == "viva"
+    title:       Optional[str]  = None
+
+
+class VivaStartRequest(BaseModel):
+    document_id: UUID
+    num_questions: int = Field(default=5, ge=1, le=20)

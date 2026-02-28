@@ -24,52 +24,31 @@ def _rate_limit(user_id: str, limit: int = 60, per_seconds: int = 60):
     _user_calls[user_id].append(now)
 
 
-async def _google_get(token: str, path: str, params: dict | None = None) -> dict:
-    def _run() -> dict:
-        service = ClassroomClient(Credentials(token=token)).service
-        parts = path.split("/")
-
-        if len(parts) == 1 and parts[0] == "courses":
-            request = service.courses().list(**(params or {}))
-            return request.execute()
-
-        if len(parts) == 3 and parts[0] == "courses" and parts[2] == "announcements":
-            course_id = parts[1]
-            request = service.courses().announcements().list(courseId=course_id, **(params or {}))
-            return request.execute()
-
-        raise HTTPException(status_code=500, detail=f"Unsupported Classroom path: {path}")
-
-    try:
-        return await asyncio.to_thread(_run)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Classroom API error: {exc}")
-
-
-async def _google_get_all_items(token: str, path: str, list_key: str, params: dict | None = None) -> list[dict]:
-    items: list[dict] = []
-    next_page_token: str | None = None
-    base_params = dict(params or {})
-
-    while True:
-        query_params = dict(base_params)
-        if next_page_token:
-            query_params["pageToken"] = next_page_token
-
-        payload = await _google_get(token, path, query_params)
-        items.extend(payload.get(list_key, []))
-        next_page_token = payload.get("nextPageToken")
-        if not next_page_token:
-            break
-
-    return items
-
-
 async def _get_classroom_client(db: AsyncSession, user_id: UUID) -> tuple[ClassroomClient, str]:
     _rate_limit(str(user_id))
+    from sqlalchemy import select
+    from app.classroom.security import decrypt_secret
+    from app.config import settings
+    from app.models.integrations import GoogleToken
+    result = await db.execute(select(GoogleToken).where(GoogleToken.user_id == user_id))
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Google account not connected. Please connect via Settings.")
     token = await get_valid_access_token(db, user_id)
-    creds = Credentials(token=token)
-    return ClassroomClient(creds), token
+    from app.classroom.oauth import _build_credentials, SCOPES
+    access_token = decrypt_secret(record.access_token)
+    refresh_token = decrypt_secret(record.refresh_token) if record.refresh_token else None
+    creds = _build_credentials(access_token, refresh_token, record.expiry, record.scope or " ".join(SCOPES))
+    # Use the refreshed token if refresh happened
+    creds_with_fresh = Credentials(
+        token=token,
+        refresh_token=refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        scopes=(record.scope.split() if record.scope else SCOPES),
+    )
+    return ClassroomClient(creds_with_fresh), token
 
 
 async def get_courses(db: AsyncSession, user_id: UUID) -> list[dict]:
@@ -78,7 +57,7 @@ async def get_courses(db: AsyncSession, user_id: UUID) -> list[dict]:
 
 
 async def get_events(db: AsyncSession, user_id: UUID) -> list[dict]:
-    classroom_client, token = await _get_classroom_client(db, user_id)
+    classroom_client, _ = await _get_classroom_client(db, user_id)
     courses = await asyncio.to_thread(classroom_client.get_courses)
 
     events: list[dict] = []
@@ -88,10 +67,16 @@ async def get_events(db: AsyncSession, user_id: UUID) -> list[dict]:
         if not course_id:
             continue
 
-        coursework_with_status = await asyncio.to_thread(
-            classroom_client.get_all_coursework_with_status,
-            course_id,
-        )
+        try:
+            coursework_with_status = await asyncio.to_thread(
+                classroom_client.get_all_coursework_with_status,
+                course_id,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Coursework fetch failed for %s: %s", course_name, exc)
+            coursework_with_status = []
+
         for item in coursework_with_status:
             due_dt = item.get("due_date")
             due_date = due_dt.date().isoformat() if due_dt else None
@@ -119,12 +104,15 @@ async def get_events(db: AsyncSession, user_id: UUID) -> list[dict]:
                 }
             )
 
-        announcements_items = await _google_get_all_items(
-            token,
-            f"courses/{course_id}/announcements",
-            "announcements",
-            {"pageSize": 100},
-        )
+        try:
+            announcements_items = await asyncio.to_thread(
+                classroom_client.get_announcements, course_id
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Announcements fetch failed for %s: %s", course_name, exc)
+            announcements_items = []
+
         for ann in announcements_items:
             events.append(
                 {

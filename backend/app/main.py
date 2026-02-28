@@ -20,6 +20,7 @@ from app.api.timetable   import router as timetable_router
 from app.api.extract     import router as extract_router
 from app.api.college_events import router as college_events_router
 from app.api.classroom import router as classroom_router
+from app.api.chat import router as chat_router
 
 
 @asynccontextmanager
@@ -86,6 +87,7 @@ api_router.include_router(alerts_router)
 api_router.include_router(timetable_router)
 api_router.include_router(college_events_router)
 api_router.include_router(classroom_router)
+api_router.include_router(chat_router)
 
 app.include_router(api_router)
 app.include_router(college_events_router)

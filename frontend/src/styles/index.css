@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: #0a0f1e;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+  h1, h2, h3 { font-family: 'DM Serif Display', Georgia, serif; }
+}
+
+@layer utilities {
+  .font-display { font-family: 'DM Serif Display', Georgia, serif; }
+  .font-mono    { font-family: 'JetBrains Mono', monospace; }
+}

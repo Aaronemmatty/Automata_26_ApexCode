@@ -6,6 +6,7 @@ from app.models.activity import Activity
 from app.models.document_alert import Document, Alert, AlertType, AlertSeverity, ExtractionStatus
 from app.models.timetable import TimetableEntry, TimetableDocument
 from app.models.integrations import GoogleToken, CollegeEvent
+from app.models.chat import ChatConversation, ChatMessage
 
 __all__ = [
     "User",
@@ -15,4 +16,5 @@ __all__ = [
     "Document", "Alert", "AlertType", "AlertSeverity", "ExtractionStatus",
     "TimetableEntry", "TimetableDocument",
     "GoogleToken", "CollegeEvent",
+    "ChatConversation", "ChatMessage",
 ]

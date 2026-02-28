@@ -1,0 +1,10 @@
+import client from './client'
+export const getSubjects = () => client.get('/attendance/subjects')
+export const addSubject = (data) => client.post('/attendance/subjects', data)
+export const updateSubject = (id, data) => client.patch(`/attendance/subjects/${id}`, data)
+export const deleteSubject = (id) => client.delete(`/attendance/subjects/${id}`)
+export const markAttendance = (data) => client.post('/attendance/mark', data)
+export const getSummary = () => client.get('/attendance/summary')
+export const getHistory = (id) => client.get(`/attendance/history/${id}`)
+export const getAttendanceAlerts = () => client.get('/attendance/alerts')
+export const getRecoveryPlan = (subjectId) => client.get(`/attendance/recovery-plan/${subjectId}`)

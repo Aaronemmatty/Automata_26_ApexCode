@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.classroom.oauth import build_google_connect_url, exchange_code_and_store
@@ -11,6 +11,7 @@ from app.config import settings
 from app.core.security import decode_access_token
 from app.core.dependencies import get_current_user
 from app.database import get_db
+from app.models.integrations import GoogleToken
 from app.models.user import User
 
 router = APIRouter(tags=["Classroom"])
@@ -77,3 +78,30 @@ async def classroom_events(
     current_user: User = Depends(get_current_user),
 ):
     return await get_events(db, current_user.id)
+
+
+@router.get("/classroom/status")
+async def classroom_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check if the current user has a connected Google account."""
+    result = await db.execute(select(GoogleToken).where(GoogleToken.user_id == current_user.id))
+    record = result.scalar_one_or_none()
+    if not record:
+        return {"connected": False}
+    return {
+        "connected": True,
+        "scope": record.scope,
+        "expiry": record.expiry.isoformat() if record.expiry else None,
+    }
+
+
+@router.delete("/classroom/disconnect")
+async def classroom_disconnect(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove stored Google credentials — user must reconnect to use Classroom."""
+    await db.execute(delete(GoogleToken).where(GoogleToken.user_id == current_user.id))
+    return {"disconnected": True}
